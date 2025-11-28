@@ -2,13 +2,12 @@ use home::home_dir;
 use regex::Regex;
 use std::fs::File;
 use std::io::{self, BufRead};
+use rand::prelude::*;
 
 fn main() {
     let shell = detect_shell();
-    println!("Detected shell: {}", shell);
 
     let entry_file = expand_home_dir(strip_home_dir_tilde(entry_file()));
-    println!("Entry file: {}", entry_file);
 
     let entry_file = entry_file.to_string();
 
@@ -20,19 +19,19 @@ fn main() {
     files.extend(found_files);
     aliases.extend(found_aliases);
 
-    println!("All files:");
+    let mut rng = rand::rng();
+    let picked_alias = aliases.choose(&mut rng);
 
-    for file in files {
-        println!("{}", file);
+    let re = Regex::new(r"^([a-z]*)=(.*)$").unwrap();
+    if let Some(capts) = re.captures(&picked_alias.unwrap()) { 
+        let actual_alias: &str = &capts[1];
+        let command: String = strip_semicolon(strip_quotes(&capts[2]));
+
+        println!("");
+        println!("Did you know?");
+        println!("You can use the alias: {:?} instead of {:?}", actual_alias, command);
+        println!("");
     }
-
-    println!("All aliases:");
-
-    for alias in aliases {
-        println!("{}", alias);
-    }
-
-    println!("Done.");
 }
 
 fn detect_shell() -> String {
@@ -64,6 +63,7 @@ fn scan_recursively(file: &str) -> [Vec<String>; 2] {
 
             return [transformed_lines, found_aliases];
         }
+        
         Err(e) => {
             eprintln!("Failed to read file: {}", e);
             println!("{}", file);
@@ -104,10 +104,14 @@ fn read_file(file: &str) -> io::Result<[Vec<String>; 2]> {
     Ok([lines, aliases])
 }
 
-fn strip_quotes(s: &str) -> &str {
-    s.strip_prefix('"')
-     .and_then(|s| s.strip_suffix('"'))
-     .unwrap_or(s)
+fn strip_quotes(s: &str) -> String{
+    s
+    .replace('"', "")
+    .replace('\'', "")
+}
+
+fn strip_semicolon(s: String) -> String {
+    s.trim_end_matches(';').to_string()
 }
 
 fn strip_home_dir_tilde(s: &str) -> &str {
