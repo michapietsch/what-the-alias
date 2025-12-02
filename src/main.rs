@@ -3,13 +3,24 @@ use regex::Regex;
 use std::fs::File;
 use std::io::{self, BufRead};
 use rand::prelude::*;
+use sysinfo::{System};
 
 fn main() {
-    let shell = detect_shell();
+    let shell = match detect_shell() {
+        Some(shell) => shell,
+        None => {
+            eprintln!("Could not detect shell.");
+            return;
+        }
+    };
 
-    let entry_file = expand_home_dir(strip_home_dir_tilde(entry_file()));
-
-    let entry_file = entry_file.to_string();
+    let entry_file = match entry_file(shell) {
+        Some(path) => expand_home_dir(path).to_string(),
+        None => {
+            eprintln!("Unsupported shell.");
+            return;
+        }
+    };
 
     let mut files = vec![entry_file.clone()];
     let mut aliases: Vec<String> = vec![];
@@ -19,27 +30,47 @@ fn main() {
     files.extend(found_files);
     aliases.extend(found_aliases);
 
-    let mut rng = rand::rng();
-    let picked_alias = aliases.choose(&mut rng);
+    let picked_alias = match random_choice(&aliases) {
+        Some(alias) => alias,
+        None => {
+            println!("");
+            println!("  :(  No aliases found in your shell configuration files.");
+            println!("      Add some to start your training. :)");
+            println!("");
+
+            return;
+        }
+    };
 
     let re = Regex::new(r"^([a-z]*)=(.*)$").unwrap();
-    if let Some(capts) = re.captures(&picked_alias.unwrap()) { 
+    if let Some(capts) = re.captures(&picked_alias) { 
         let actual_alias: &str = &capts[1];
         let command: String = strip_semicolon(strip_quotes(&capts[2]));
 
         println!("");
-        println!("Did you know?");
-        println!("You can use the alias: {:?} instead of {:?}", actual_alias, command);
+        println!("    Did you know?");
+        println!("    You can use the alias: {:?} instead of {:?}", actual_alias, command);
         println!("");
     }
 }
 
-fn detect_shell() -> String {
-    String::from("zsh")
+fn detect_shell() -> Option<String> {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    let current_pid = sysinfo::get_current_pid().ok()?;
+    let current_process = sys.process(current_pid)?;
+    let parent_pid = current_process.parent()?;
+    let parent_process = sys.process(parent_pid)?;
+    parent_process.name().to_os_string().into_string().ok()
 }
 
-fn entry_file() -> &'static str {
-    "~/.zshrc"
+fn entry_file(shell: String) -> Option<&'static str> {
+    match shell.as_str() {
+        "zsh" => Some("~/.zshrc"),
+        "bash" => Some("~/.bashrc"),
+        _ => None,
+    }
 }
 
 fn scan_recursively(file: &str) -> [Vec<String>; 2] {
@@ -63,7 +94,7 @@ fn scan_recursively(file: &str) -> [Vec<String>; 2] {
 
             return [transformed_lines, found_aliases];
         }
-        
+
         Err(e) => {
             eprintln!("Failed to read file: {}", e);
             println!("{}", file);
@@ -104,10 +135,18 @@ fn read_file(file: &str) -> io::Result<[Vec<String>; 2]> {
     Ok([lines, aliases])
 }
 
+fn random_choice(aliases: &Vec<String>) -> Option<&String> {
+    if aliases.is_empty() {
+        return None;
+    }
+
+    let mut rng = rand::rng();
+    let picked_alias = aliases.choose(&mut rng);
+    picked_alias
+}
+
 fn strip_quotes(s: &str) -> String{
-    s
-    .replace('"', "")
-    .replace('\'', "")
+    s .replace('"', "") .replace('\'', "")
 }
 
 fn strip_semicolon(s: String) -> String {
@@ -119,6 +158,5 @@ fn strip_home_dir_tilde(s: &str) -> &str {
 }
 
 fn expand_home_dir(path: &str) -> String {
-    home_dir().expect("Failed to get home directory").join(path).to_str().unwrap().to_string()
+    home_dir().expect("Failed to get home directory").join(strip_home_dir_tilde(path)).to_str().unwrap().to_string()
 }
-
