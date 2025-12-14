@@ -1,5 +1,6 @@
 use home::home_dir;
 use regex::Regex;
+use std::env;
 use std::fs::File;
 use std::io::{self, BufRead};
 use rand::prelude::*;
@@ -9,7 +10,8 @@ fn main() {
     let shell = match detect_shell() {
         Some(shell) => shell,
         None => {
-            eprintln!("Could not detect shell.");
+            header();
+            println!("    Could not detect shell. :(");
             return;
         }
     };
@@ -17,7 +19,13 @@ fn main() {
     let entry_file = match entry_file(shell) {
         Some(path) => expand_home_dir(path).to_string(),
         None => {
-            eprintln!("Unsupported shell.");
+            header();
+            println!("    Unsupported shell or config file not found.");
+            println!("");
+            println!("    Currently supported shells are:");
+            println!("    -   Bash (.bashrc)");
+            println!("    -   Zsh (.zshrc)");
+            println!("");
             return;
         }
     };
@@ -30,27 +38,12 @@ fn main() {
     files.extend(found_files);
     aliases.extend(found_aliases);
 
-    let picked_alias = match random_choice(&aliases) {
-        Some(alias) => alias,
-        None => {
-            println!("");
-            println!("  :(  No aliases found in your shell configuration files.");
-            println!("      Add some to start your training. :)");
-            println!("");
+    let args: Vec<String> = env::args().collect();
 
-            return;
-        }
-    };
-
-    let re = Regex::new(r"^([a-z]*)=(.*)$").unwrap();
-    if let Some(capts) = re.captures(&picked_alias) { 
-        let actual_alias: &str = &capts[1];
-        let command: String = strip_semicolon(strip_quotes(&capts[2]));
-
-        println!("");
-        println!("    Did you know?");
-        println!("    You can use the alias: {:?} instead of {:?}", actual_alias, command);
-        println!("");
+    match args.get(1).map(String::as_str) {
+        Some("reminder") => remind(aliases),
+        Some(_) => (),
+        None => (),
     }
 }
 
@@ -143,6 +136,51 @@ fn random_choice(aliases: &Vec<String>) -> Option<&String> {
     let mut rng = rand::rng();
     let picked_alias = aliases.choose(&mut rng);
     picked_alias
+}
+
+fn remind(aliases: Vec<String>) {
+    let args: Vec<String> = env::args().collect();
+
+    match args.get(2).map(String::as_str) {
+        Some("--random") => remind_random(aliases),
+        Some(_) => (),
+        None => (),
+    }
+}
+
+fn remind_random(aliases: Vec<String>) {
+    let picked_alias = match random_choice(&aliases) {
+        Some(alias) => alias,
+        None => {
+            header();
+
+            println!("  :(  No aliases found in your shell configuration files.");
+            println!("      Add some to start your training. :)");
+            println!("");
+
+            return;
+        }
+    };
+
+    let re = Regex::new(r"^([a-z]*)=(.*)$").unwrap();
+
+    if let Some(capts) = re.captures(&picked_alias) { 
+        let actual_alias: &str = &capts[1];
+        let command: String = strip_semicolon(strip_quotes(&capts[2]));
+
+        header();
+
+        println!("    Did you know?");
+        println!("    You can use the alias: {:?} instead of {:?}", actual_alias, command);
+        println!("");
+    }
+}
+
+fn header()
+{
+    println!("");
+    println!("    What The Alias v0.1.0");
+    println!("");
 }
 
 fn strip_quotes(s: &str) -> String{
