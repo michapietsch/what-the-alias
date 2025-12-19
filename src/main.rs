@@ -42,7 +42,7 @@ fn main() {
 
     match args.get(1).map(String::as_str) {
         Some("reminder") => remind(aliases),
-        Some(_) => (),
+        Some(_) => search(aliases, &args[1]),
         None => (),
     }
 }
@@ -176,10 +176,46 @@ fn remind_random(aliases: Vec<String>) {
     }
 }
 
+fn search(aliases: Vec<String>, query: &str) {
+    header();
+
+    let mut found_aliases: Vec<String> = vec![];
+
+    println!("    Searching for: {}", query);
+    println!("");
+
+    for alias in aliases {
+        if alias.contains(query) {
+            found_aliases.push(alias);
+        }
+    }
+
+    for alias in &found_aliases {
+        print_found_alias(&alias);
+    }
+
+    if found_aliases.is_empty() {
+        println!("    No aliases found matching: {}", query);
+    }
+
+    println!("");
+}
+
+fn print_found_alias(alias: &str) {
+    let re = Regex::new(r"^([a-z]*)=(.*)$").unwrap();
+
+    if let Some(capts) = re.captures(&alias) { 
+        let actual_alias: &str = &capts[1];
+        let command: String = strip_semicolon(strip_quotes(&capts[2]));
+
+        println!("    {:?} => {:?}", actual_alias, command);
+    }
+}
+
 fn header()
 {
     println!("");
-    println!("    What The Alias v0.1.0");
+    println!("    What The Alias v0.2.0");
     println!("");
 }
 

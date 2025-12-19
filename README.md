@@ -5,8 +5,9 @@
 Recursively scans shell config files and collects alias definitions in order to:
 
 - remind you of a random alias
+- search for an alias
 - train new aliases with spaced repetition (coming soon)
-- search for an alias (coming sooner)
+- instant search for an alias (coming sooner)
 
 ## Shell alias trainer
 
@@ -22,9 +23,42 @@ You then find the executable at: `target/release/wta`. Include this directory in
 
 ## Usage:
 
-Get reminded of a random alias:
+### Quickly search for an alias:
+
+`wta <phrase to search>`
+
+For example:
+
+```
+$ wta git
+
+    What The Alias v0.2.0
+
+    Searching for: git
+
+    "gco" => "git checkout"
+    "gst" => "git status"
+    "gd" => "git diff -w"
+    "gl" => "git log --graph --oneline --all"
+    "gcam" => "git commit -am"
+
+```
+
+### Get reminded of a random alias:
 
 `wta reminder --random`
+
+For example:
+
+```
+$ wta reminder --random
+
+    What The Alias v0.2.0
+
+    Did you know?
+    You can use the alias: "gd" instead of "git diff -w"
+
+```
 
 ## Supported shells
 
